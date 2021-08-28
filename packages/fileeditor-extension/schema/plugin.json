@@ -1,4 +1,6 @@
 {
+  "title": "Text Editor",
+  "description": "Text editor settings.",
   "jupyter.lab.setting-icon": "ui-components:text-editor",
   "jupyter.lab.setting-icon-label": "Editor",
   "jupyter.lab.menus": {
@@ -30,22 +32,6 @@
           {
             "type": "separator",
             "rank": 30
-          },
-          {
-            "command": "fileeditor:change-font-size",
-            "rank": 30,
-            "args": {
-              "delta": 1,
-              "isMenu": true
-            }
-          },
-          {
-            "command": "fileeditor:change-font-size",
-            "rank": 30,
-            "args": {
-              "delta": -1,
-              "isMenu": true
-            }
           },
           {
             "type": "submenu",
@@ -93,24 +79,122 @@
             "rank": 30
           },
           {
-            "command": "fileeditor:toggle-autoclosing-brackets",
+            "command": "fileeditor:toggle-autoclosing-brackets-universal",
             "rank": 30
           },
           {
-            "type": "separator",
-            "rank": 30
+            "command": "fileeditor:change-font-size",
+            "rank": 30,
+            "args": {
+              "delta": 1,
+              "isMenu": true
+            }
+          },
+          {
+            "command": "fileeditor:change-font-size",
+            "rank": 30,
+            "args": {
+              "delta": -1,
+              "isMenu": true
+            }
           }
         ]
       }
+    ],
+    "context": [
+      {
+        "command": "fileeditor:undo",
+        "selector": ".jp-FileEditor",
+        "rank": 1
+      },
+      {
+        "command": "fileeditor:redo",
+        "selector": ".jp-FileEditor",
+        "rank": 2
+      },
+      {
+        "command": "fileeditor:cut",
+        "selector": ".jp-FileEditor",
+        "rank": 3
+      },
+      {
+        "command": "fileeditor:copy",
+        "selector": ".jp-FileEditor",
+        "rank": 4
+      },
+      {
+        "command": "fileeditor:paste",
+        "selector": ".jp-FileEditor",
+        "rank": 5
+      },
+      {
+        "command": "fileeditor:select-all",
+        "selector": ".jp-FileEditor",
+        "rank": 6
+      },
+      {
+        "command": "fileeditor:create-console",
+        "selector": ".jp-FileEditor",
+        "rank": 10
+      },
+      {
+        "command": "fileeditor:markdown-preview",
+        "selector": ".jp-FileEditor",
+        "rank": 11
+      }
     ]
   },
-  "title": "Text Editor",
-  "description": "Text editor settings.",
+  "jupyter.lab.toolbars": {
+    "Editor": []
+  },
+  "jupyter.lab.transform": true,
+  "properties": {
+    "editorConfig": {
+      "title": "Editor Configuration",
+      "description": "The configuration for all text editors.\nIf `fontFamily`, `fontSize` or `lineHeight` are `null`,\nvalues from current theme are used.",
+      "$ref": "#/definitions/editorConfig",
+      "default": {
+        "autoClosingBrackets": false,
+        "codeFolding": false,
+        "cursorBlinkRate": 530,
+        "fontFamily": null,
+        "fontSize": null,
+        "insertSpaces": true,
+        "lineHeight": null,
+        "lineNumbers": true,
+        "lineWrap": "on",
+        "matchBrackets": true,
+        "readOnly": false,
+        "rulers": [],
+        "tabSize": 4,
+        "wordWrapColumn": 80
+      }
+    },
+    "toolbar": {
+      "title": "Text editor toolbar items",
+      "description": "Note: To disable a toolbar item,\ncopy it to User Preferences and add the\n\"disabled\" key. Toolbar description:",
+      "items": {
+        "$ref": "#/definitions/toolbarItem"
+      },
+      "type": "array",
+      "default": []
+    }
+  },
+  "additionalProperties": false,
+  "type": "object",
   "definitions": {
     "editorConfig": {
       "properties": {
         "autoClosingBrackets": {
           "type": "boolean"
+        },
+        "codeFolding": {
+          "type": "boolean"
+        },
+        "cursorBlinkRate": {
+          "type": "number",
+          "title": "Cursor blinking rate",
+          "description": "Half-period in milliseconds used for cursor blinking. The default blink rate is 530ms. By setting this to zero, blinking can be disabled. A negative value hides the cursor entirely."
         },
         "fontFamily": {
           "type": ["string", "null"]
@@ -119,6 +203,9 @@
           "type": ["integer", "null"],
           "minimum": 1,
           "maximum": 100
+        },
+        "insertSpaces": {
+          "type": "boolean"
         },
         "lineHeight": {
           "type": ["number", "null"]
@@ -136,7 +223,13 @@
         "readOnly": {
           "type": "boolean"
         },
-        "insertSpaces": {
+        "rulers": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "showTrailingSpace": {
           "type": "boolean"
         },
         "tabSize": {
@@ -144,43 +237,56 @@
         },
         "wordWrapColumn": {
           "type": "integer"
-        },
-        "rulers": {
-          "type": "array",
-          "items": {
-            "type": "number"
-          }
-        },
-        "codeFolding": {
-          "type": "boolean"
         }
       },
       "additionalProperties": false,
       "type": "object"
+    },
+    "toolbarItem": {
+      "properties": {
+        "name": {
+          "title": "Unique name",
+          "type": "string"
+        },
+        "args": {
+          "title": "Command arguments",
+          "type": "object"
+        },
+        "command": {
+          "title": "Command id",
+          "type": "string",
+          "default": ""
+        },
+        "disabled": {
+          "title": "Whether the item is ignored or not",
+          "type": "boolean",
+          "default": false
+        },
+        "icon": {
+          "title": "Item icon id",
+          "description": "If defined, it will override the command icon",
+          "type": "string"
+        },
+        "label": {
+          "title": "Item label",
+          "description": "If defined, it will override the command label",
+          "type": "string"
+        },
+        "type": {
+          "title": "Item type",
+          "type": "string",
+          "enum": ["command", "spacer"]
+        },
+        "rank": {
+          "title": "Item rank",
+          "type": "number",
+          "minimum": 0,
+          "default": 50
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false,
+      "type": "object"
     }
-  },
-  "properties": {
-    "editorConfig": {
-      "title": "Editor Configuration",
-      "description": "The configuration for all text editors.\nIf `fontFamily`, `fontSize` or `lineHeight` are `null`,\nvalues from current theme are used.",
-      "$ref": "#/definitions/editorConfig",
-      "default": {
-        "autoClosingBrackets": true,
-        "fontFamily": null,
-        "fontSize": null,
-        "lineHeight": null,
-        "lineNumbers": true,
-        "lineWrap": "on",
-        "matchBrackets": true,
-        "readOnly": false,
-        "insertSpaces": true,
-        "tabSize": 4,
-        "wordWrapColumn": 80,
-        "rulers": [],
-        "codeFolding": false
-      }
-    }
-  },
-  "additionalProperties": false,
-  "type": "object"
+  }
 }

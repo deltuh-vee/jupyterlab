@@ -12,10 +12,8 @@ import {
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
 import {
-  CommandToolbarButton,
   ICommandPalette,
   MainAreaWidget,
-  ReactWidget,
   WidgetTracker
 } from '@jupyterlab/apputils';
 import { IChangedArgs } from '@jupyterlab/coreutils';
@@ -37,8 +35,10 @@ import {
 import {
   addIcon,
   clearIcon,
+  CommandToolbarButton,
   HTMLSelect,
-  listIcon
+  listIcon,
+  ReactWidget
 } from '@jupyterlab/ui-components';
 import { UUID } from '@lumino/coreutils';
 import { DockLayout, Widget } from '@lumino/widgets';
@@ -236,11 +236,6 @@ function activateLogConsole(
       trans.__('Set Log Level to %1', toTitleCase(args.level as string))
   });
 
-  app.contextMenu.addItem({
-    command: CommandIDs.open,
-    selector: '.jp-Notebook'
-  });
-
   if (palette) {
     palette.addItem({
       command: CommandIDs.open,
@@ -356,7 +351,7 @@ export class LogLevelSwitcher extends ReactWidget {
     }
   };
 
-  render() {
+  render(): JSX.Element {
     const logger = this._logConsole.logger;
     return (
       <>

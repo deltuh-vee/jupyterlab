@@ -3,6 +3,7 @@
 
 import { Gettext } from './gettext';
 import { ITranslator, TranslationBundle, TranslatorConnector } from './tokens';
+import { normalizeDomain } from './utils';
 
 /**
  * Translation Manager
@@ -19,7 +20,7 @@ export class TranslationManager implements ITranslator {
    *
    * @param locale The language locale to use for translations.
    */
-  async fetch(locale: string) {
+  async fetch(locale: string): Promise<void> {
     this._currentLocale = locale;
     this._languageData = await this._connector.fetch({ language: locale });
     this._domainData = this._languageData?.data || {};
@@ -39,6 +40,7 @@ export class TranslationManager implements ITranslator {
       if (this._currentLocale == 'en') {
         return this._englishBundle;
       } else {
+        domain = normalizeDomain(domain);
         if (!(domain in this._translationBundles)) {
           let translationBundle = new Gettext({
             domain: domain,

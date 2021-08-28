@@ -15,6 +15,7 @@ import { JupyterServer } from '@jupyterlab/testutils/lib/start_jupyter_server';
 import { Message, MessageLoop } from '@lumino/messaging';
 import { Widget } from '@lumino/widgets';
 import { generate, simulate } from 'simulate-event';
+import * as nbformat from '@jupyterlab/nbformat';
 import {
   INotebookModel,
   Notebook,
@@ -37,12 +38,23 @@ afterAll(async () => {
 const contentFactory = utils.createNotebookFactory();
 const editorConfig = utils.defaultEditorConfig;
 const rendermime = utils.defaultRenderMime();
+const notebookConfig = {
+  scrollPastEnd: true,
+  defaultCell: 'code' as nbformat.CellType,
+  recordTiming: false,
+  numberCellsToRenderDirectly: 2,
+  renderCellOnIdle: true,
+  observedTopMargin: '1000px',
+  observedBottomMargin: '1000px',
+  maxNumberOutputs: 50
+};
 
 const options: Notebook.IOptions = {
   rendermime,
   contentFactory,
   mimeTypeService: utils.mimeTypeService,
-  editorConfig
+  editorConfig,
+  notebookConfig
 };
 
 function createWidget(): LogStaticNotebook {
@@ -398,19 +410,19 @@ describe('@jupyter/notebook', () => {
       it('should be settable', () => {
         const widget = createWidget();
         expect(widget.widgets[0].editor.getOption('autoClosingBrackets')).toBe(
-          true
+          false
         );
         const newConfig = {
           raw: editorConfig.raw,
           markdown: editorConfig.markdown,
           code: {
             ...editorConfig.code,
-            autoClosingBrackets: false
+            autoClosingBrackets: true
           }
         };
         widget.editorConfig = newConfig;
         expect(widget.widgets[0].editor.getOption('autoClosingBrackets')).toBe(
-          false
+          true
         );
       });
     });
@@ -989,60 +1001,78 @@ describe('@jupyter/notebook', () => {
         const widget = createActiveWidget();
         widget.model!.fromJSON(utils.DEFAULT_CONTENT);
 
-        permutations.forEach(p => {
-          checkSelection(widget, p[0], p[1], p[2]);
-        });
+        expect(() => {
+          permutations.forEach(p => {
+            checkSelection(widget, p[0], p[1], p[2]);
+          });
+        }).not.toThrow();
       });
 
       it('should work when we only have an active cell, with no existing selection', () => {
         const widget = createActiveWidget();
         widget.model!.fromJSON(utils.DEFAULT_CONTENT);
 
-        permutations.forEach(p => {
-          if (p[0] === p[1]) {
-            checkSelection(widget, p[0], p[1], p[2], false);
-          }
-        });
+        expect(() => {
+          permutations.forEach(p => {
+            if (p[0] === p[1]) {
+              checkSelection(widget, p[0], p[1], p[2], false);
+            }
+          });
+        }).not.toThrow();
       });
 
       it('should clip when the index is greater than the last index', () => {
         const widget = createActiveWidget();
         widget.model!.fromJSON(utils.DEFAULT_CONTENT);
 
-        permutations.forEach(p => {
-          checkSelection(widget, p[0], p[1], Number.MAX_SAFE_INTEGER);
-        });
+        expect(() => {
+          permutations.forEach(p => {
+            checkSelection(widget, p[0], p[1], Number.MAX_SAFE_INTEGER);
+          });
+        }).not.toThrow();
       });
 
       it('should clip when the index is greater than the last index with no existing selection', () => {
         const widget = createActiveWidget();
         widget.model!.fromJSON(utils.DEFAULT_CONTENT);
 
-        permutations.forEach(p => {
-          if (p[0] === p[1]) {
-            checkSelection(widget, p[0], p[1], Number.MAX_SAFE_INTEGER, false);
-          }
-        });
+        expect(() => {
+          permutations.forEach(p => {
+            if (p[0] === p[1]) {
+              checkSelection(
+                widget,
+                p[0],
+                p[1],
+                Number.MAX_SAFE_INTEGER,
+                false
+              );
+            }
+          });
+        }).not.toThrow();
       });
 
       it('should clip when the index is less than 0', () => {
         const widget = createActiveWidget();
         widget.model!.fromJSON(utils.DEFAULT_CONTENT);
 
-        permutations.forEach(p => {
-          checkSelection(widget, p[0], p[1], -10);
-        });
+        expect(() => {
+          permutations.forEach(p => {
+            checkSelection(widget, p[0], p[1], -10);
+          });
+        }).not.toThrow();
       });
 
       it('should clip when the index is less than 0 with no existing selection', () => {
         const widget = createActiveWidget();
         widget.model!.fromJSON(utils.DEFAULT_CONTENT);
 
-        permutations.forEach(p => {
-          if (p[0] === p[1]) {
-            checkSelection(widget, p[0], p[1], -10, false);
-          }
-        });
+        expect(() => {
+          permutations.forEach(p => {
+            if (p[0] === p[1]) {
+              checkSelection(widget, p[0], p[1], -10, false);
+            }
+          });
+        }).not.toThrow();
       });
 
       it('handles the case of no cells', () => {
@@ -1581,6 +1611,23 @@ describe('@jupyter/notebook', () => {
         widget.activeCellIndex = 2;
         widget.model!.cells.remove(1);
         expect(widget.activeCell).toBe(widget.widgets[1]);
+      });
+    });
+
+    // WIP See https://github.com/jupyterlab/jupyterlab/issues/10526
+    describe('#virtualNotebook()', () => {
+      it('should render the last cell widget', () => {
+        const model = new NotebookModel();
+        const widget = new StaticNotebook(options);
+        widget.model = model;
+        widget.model!.fromJSON(utils.DEFAULT_CONTENT);
+        const cell = widget.widgets[5];
+        expect(
+          cell.inputArea.editorWidget.model.value.text.startsWith(
+            'from IPython.display import Latex'
+          )
+        ).toBe(true);
+        console.log();
       });
     });
   });

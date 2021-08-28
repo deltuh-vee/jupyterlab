@@ -10,29 +10,26 @@ import {
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
-
 import {
+  createToolbarFactory,
   Dialog,
   ICommandPalette,
   ISessionContextDialogs,
+  IToolbarWidgetRegistry,
   MainAreaWidget,
   sessionContextDialogs,
   showDialog,
+  Toolbar,
   WidgetTracker
 } from '@jupyterlab/apputils';
-
 import { Cell, CodeCell, ICellModel, MarkdownCell } from '@jupyterlab/cells';
-
 import { IEditorServices } from '@jupyterlab/codeeditor';
-
 import { PageConfig, URLExt } from '@jupyterlab/coreutils';
-
 import { IDocumentManager } from '@jupyterlab/docmanager';
-
+import { ToolbarItems as DocToolbarItems } from '@jupyterlab/docmanager-extension';
+import { DocumentRegistry } from '@jupyterlab/docregistry';
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
-
 import { ILauncher } from '@jupyterlab/launcher';
-
 import {
   IEditMenu,
   IFileMenu,
@@ -42,9 +39,7 @@ import {
   IRunMenu,
   IViewMenu
 } from '@jupyterlab/mainmenu';
-
 import * as nbformat from '@jupyterlab/nbformat';
-
 import {
   CommandEditStatus,
   INotebookTools,
@@ -58,31 +53,29 @@ import {
   NotebookTracker,
   NotebookTrustStatus,
   NotebookWidgetFactory,
-  StaticNotebook
+  StaticNotebook,
+  ToolbarItems
 } from '@jupyterlab/notebook';
 import {
   IObservableList,
   IObservableUndoableList
 } from '@jupyterlab/observables';
-
 import { IPropertyInspectorProvider } from '@jupyterlab/property-inspector';
-
 import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
-
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
-
 import { IStateDB } from '@jupyterlab/statedb';
-
 import { IStatusBar } from '@jupyterlab/statusbar';
-
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
-
-import { buildIcon, notebookIcon } from '@jupyterlab/ui-components';
-
+import {
+  addIcon,
+  buildIcon,
+  copyIcon,
+  cutIcon,
+  notebookIcon,
+  pasteIcon
+} from '@jupyterlab/ui-components';
 import { ArrayExt } from '@lumino/algorithm';
-
 import { CommandRegistry } from '@lumino/commands';
-
 import {
   JSONExt,
   JSONObject,
@@ -91,13 +84,9 @@ import {
   ReadonlyPartialJSONObject,
   UUID
 } from '@lumino/coreutils';
-
 import { DisposableSet } from '@lumino/disposable';
-
 import { Message, MessageLoop } from '@lumino/messaging';
-
 import { Menu, Panel } from '@lumino/widgets';
-
 import { logNotebookOutput } from './nboutput';
 
 /**
@@ -246,6 +235,8 @@ namespace CommandIDs {
 
   export const replaceSelection = 'notebook:replace-selection';
 
+  export const autoClosingBrackets = 'notebook:toggle-autoclosing-brackets';
+
   export const toggleCollapseCmd = 'Collapsible_Headings:Toggle_Collapse';
 
   export const collapseAllCmd = 'Collapsible_Headings:Collapse_All';
@@ -261,10 +252,15 @@ namespace CommandIDs {
 const FACTORY = 'Notebook';
 
 /**
- * The exluded Export To ...
+ * The excluded Export To ...
  * (returned from nbconvert's export list)
  */
 const FORMAT_EXCLUDE = ['notebook', 'python', 'custom'];
+
+/**
+ * Setting Id storing the customized toolbar definition.
+ */
+const PANEL_SETTINGS = '@jupyterlab/notebook-extension:panel';
 
 /**
  * The notebook widget tracker provider.
@@ -517,8 +513,10 @@ const widgetFactoryPlugin: JupyterFrontEndPlugin<NotebookWidgetFactory.IFactory>
     IEditorServices,
     IRenderMimeRegistry,
     ISessionContextDialogs,
+    IToolbarWidgetRegistry,
     ITranslator
   ],
+  optional: [ISettingRegistry],
   activate: activateWidgetFactory,
   autoStart: true
 };
@@ -696,8 +694,46 @@ function activateWidgetFactory(
   editorServices: IEditorServices,
   rendermime: IRenderMimeRegistry,
   sessionContextDialogs: ISessionContextDialogs,
-  translator: ITranslator
+  toolbarRegistry: IToolbarWidgetRegistry,
+  translator: ITranslator,
+  settingRegistry: ISettingRegistry | null
 ): NotebookWidgetFactory.IFactory {
+  const { commands } = app;
+  let toolbarFactory:
+    | ((widget: NotebookPanel) => DocumentRegistry.IToolbarItem[])
+    | undefined;
+
+  // Register notebook toolbar widgets
+  toolbarRegistry.registerFactory<NotebookPanel>(FACTORY, 'save', panel =>
+    DocToolbarItems.createSaveButton(commands, panel.context.fileChanged)
+  );
+  toolbarRegistry.registerFactory<NotebookPanel>(FACTORY, 'cellType', panel =>
+    ToolbarItems.createCellTypeItem(panel, translator)
+  );
+  toolbarRegistry.registerFactory<NotebookPanel>(FACTORY, 'kernelName', panel =>
+    Toolbar.createKernelNameItem(
+      panel.sessionContext,
+      sessionContextDialogs,
+      translator
+    )
+  );
+  toolbarRegistry.registerFactory<NotebookPanel>(
+    FACTORY,
+    'kernelStatus',
+    panel => Toolbar.createKernelStatusItem(panel.sessionContext, translator)
+  );
+
+  if (settingRegistry) {
+    // Create the factory
+    toolbarFactory = createToolbarFactory(
+      toolbarRegistry,
+      settingRegistry,
+      FACTORY,
+      PANEL_SETTINGS,
+      translator
+    );
+  }
+
   const factory = new NotebookWidgetFactory({
     name: FACTORY,
     fileTypes: ['notebook'],
@@ -705,12 +741,13 @@ function activateWidgetFactory(
     defaultFor: ['notebook'],
     preferKernel: true,
     canStartKernel: true,
-    rendermime: rendermime,
+    rendermime,
     contentFactory,
     editorConfig: StaticNotebook.defaultEditorConfig,
     notebookConfig: StaticNotebook.defaultNotebookConfig,
     mimeTypeService: editorServices.mimeTypeService,
     sessionDialogs: sessionContextDialogs,
+    toolbarFactory,
     translator: translator
   });
   app.docRegistry.addWidgetFactory(factory);
@@ -1065,6 +1102,36 @@ function activateNotebookHandler(
         settings.changed.connect(() => {
           updateConfig(settings);
         });
+        commands.addCommand(CommandIDs.autoClosingBrackets, {
+          execute: args => {
+            const codeConfig = settings.get('codeCellConfig')
+              .composite as JSONObject;
+            const markdownConfig = settings.get('markdownCellConfig')
+              .composite as JSONObject;
+            const rawConfig = settings.get('rawCellConfig')
+              .composite as JSONObject;
+
+            const anyToggled =
+              codeConfig.autoClosingBrackets ||
+              markdownConfig.autoClosingBrackets ||
+              rawConfig.autoClosingBrackets;
+            const toggled = !!(args['force'] ?? !anyToggled);
+            [
+              codeConfig.autoClosingBrackets,
+              markdownConfig.autoClosingBrackets,
+              rawConfig.autoClosingBrackets
+            ] = [toggled, toggled, toggled];
+
+            void settings.set('codeCellConfig', codeConfig);
+            void settings.set('markdownCellConfig', markdownConfig);
+            void settings.set('rawCellConfig', rawConfig);
+          },
+          label: trans.__('Auto Close Brackets for All Notebook Cell Types'),
+          isToggled: () =>
+            ['codeCellConfig', 'markdownCellConfig', 'rawCellConfig'].some(
+              x => (settings.get(x).composite as JSONObject).autoClosingBrackets
+            )
+        });
       })
       .catch((reason: Error) => {
         console.warn(reason.message);
@@ -1173,11 +1240,13 @@ function activateNotebookHandler(
     return commands
       .execute('docmanager:new-untitled', { path: cwd, type: 'notebook' })
       .then(model => {
-        return commands.execute('docmanager:open', {
-          path: model.path,
-          factory: FACTORY,
-          kernel: { name: kernelName }
-        });
+        if (model != undefined) {
+          return commands.execute('docmanager:open', {
+            path: model.path,
+            factory: FACTORY,
+            kernel: { name: kernelName }
+          });
+        }
       });
   };
 
@@ -1191,7 +1260,7 @@ function activateNotebookHandler(
           ''
         );
       }
-      if (args['isPalette']) {
+      if (args['isPalette'] || args['isContextMenu']) {
         return trans.__('New Notebook');
       }
       return trans.__('Notebook');
@@ -1252,137 +1321,6 @@ function activateNotebookHandler(
     });
   }
 
-  // Cell context menu groups
-  app.contextMenu.addItem({
-    type: 'separator',
-    selector: '.jp-Notebook .jp-Cell',
-    rank: 0
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.cut,
-    selector: '.jp-Notebook .jp-Cell',
-    rank: 1
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.copy,
-    selector: '.jp-Notebook .jp-Cell',
-    rank: 2
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.pasteBelow,
-    selector: '.jp-Notebook .jp-Cell',
-    rank: 3
-  });
-  app.contextMenu.addItem({
-    type: 'separator',
-    selector: '.jp-Notebook .jp-Cell',
-    rank: 4
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.deleteCell,
-    selector: '.jp-Notebook .jp-Cell',
-    rank: 5
-  });
-  app.contextMenu.addItem({
-    type: 'separator',
-    selector: '.jp-Notebook .jp-Cell',
-    rank: 6
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.split,
-    selector: '.jp-Notebook .jp-Cell',
-    rank: 7
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.merge,
-    selector: '.jp-Notebook .jp-Cell',
-    rank: 8
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.mergeAbove,
-    selector: '.jp-Notebook .jp-Cell',
-    rank: 8
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.mergeBelow,
-    selector: '.jp-Notebook .jp-Cell',
-    rank: 8
-  });
-  app.contextMenu.addItem({
-    type: 'separator',
-    selector: '.jp-Notebook .jp-Cell',
-    rank: 9
-  });
-
-  // CodeCell context menu groups
-  app.contextMenu.addItem({
-    command: CommandIDs.createOutputView,
-    selector: '.jp-Notebook .jp-CodeCell',
-    rank: 10
-  });
-  app.contextMenu.addItem({
-    type: 'separator',
-    selector: '.jp-Notebook .jp-CodeCell',
-    rank: 11
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.clearOutputs,
-    selector: '.jp-Notebook .jp-CodeCell',
-    rank: 12
-  });
-
-  // Notebook context menu groups
-  app.contextMenu.addItem({
-    command: CommandIDs.clearAllOutputs,
-    selector: '.jp-Notebook',
-    rank: 0
-  });
-  app.contextMenu.addItem({
-    type: 'separator',
-    selector: '.jp-Notebook',
-    rank: 1
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.enableOutputScrolling,
-    selector: '.jp-Notebook',
-    rank: 2
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.disableOutputScrolling,
-    selector: '.jp-Notebook',
-    rank: 3
-  });
-  app.contextMenu.addItem({
-    type: 'separator',
-    selector: '.jp-Notebook',
-    rank: 4
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.undoCellAction,
-    selector: '.jp-Notebook',
-    rank: 5
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.redoCellAction,
-    selector: '.jp-Notebook',
-    rank: 6
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.restart,
-    selector: '.jp-Notebook',
-    rank: 7
-  });
-  app.contextMenu.addItem({
-    type: 'separator',
-    selector: '.jp-Notebook',
-    rank: 8
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.createConsole,
-    selector: '.jp-Notebook',
-    rank: 9
-  });
-
   return tracker;
 }
 
@@ -1428,6 +1366,8 @@ function addCommands(
     for (const cell of notebook.widgets) {
       if (cell instanceof MarkdownCell && cell.headingCollapsed) {
         NotebookActions.setHeadingCollapse(cell, true, notebook);
+      }
+      if (cell.model.id === notebook.activeCell?.model?.id) {
         NotebookActions.expandParent(cell, notebook);
       }
     }
@@ -1763,6 +1703,7 @@ function addCommands(
   });
   commands.addCommand(CommandIDs.cut, {
     label: trans.__('Cut Cells'),
+    caption: trans.__('Cut the selected cells'),
     execute: args => {
       const current = getCurrent(tracker, shell, args);
 
@@ -1770,10 +1711,12 @@ function addCommands(
         return NotebookActions.cut(current.content);
       }
     },
+    icon: args => (args.toolbar ? cutIcon : undefined),
     isEnabled
   });
   commands.addCommand(CommandIDs.copy, {
     label: trans.__('Copy Cells'),
+    caption: trans.__('Copy the selected cells'),
     execute: args => {
       const current = getCurrent(tracker, shell, args);
 
@@ -1781,10 +1724,12 @@ function addCommands(
         return NotebookActions.copy(current.content);
       }
     },
+    icon: args => (args.toolbar ? copyIcon : ''),
     isEnabled
   });
   commands.addCommand(CommandIDs.pasteBelow, {
     label: trans.__('Paste Cells Below'),
+    caption: trans.__('Paste cells from the clipboard'),
     execute: args => {
       const current = getCurrent(tracker, shell, args);
 
@@ -1792,6 +1737,7 @@ function addCommands(
         return NotebookActions.paste(current.content, 'below');
       }
     },
+    icon: args => (args.toolbar ? pasteIcon : undefined),
     isEnabled
   });
   commands.addCommand(CommandIDs.pasteAbove, {
@@ -1884,6 +1830,7 @@ function addCommands(
   });
   commands.addCommand(CommandIDs.insertBelow, {
     label: trans.__('Insert Cell Below'),
+    caption: trans.__('Insert a cell below'),
     execute: args => {
       const current = getCurrent(tracker, shell, args);
 
@@ -1891,6 +1838,7 @@ function addCommands(
         return NotebookActions.insertBelow(current.content);
       }
     },
+    icon: args => (args.toolbar ? addIcon : undefined),
     isEnabled
   });
   commands.addCommand(CommandIDs.selectAbove, {
@@ -2538,9 +2486,13 @@ function populateMenus(
   mainMenu.runMenu.codeRunners.add({
     tracker,
     runLabel: (n: number) => trans.__('Run Selected Cells'),
+    runCaption: (n: number) => trans.__('Run the selected cells and advance'),
     runAllLabel: (n: number) => trans.__('Run All Cells'),
+    runAllCaption: (n: number) => trans.__('Run the all notebook cells'),
     restartAndRunAllLabel: (n: number) =>
       trans.__('Restart Kernel and Run All Cells…'),
+    restartAndRunAllCaption: (n: number) =>
+      trans.__('Restart the kernel, then re-run the whole notebook'),
     run: current => {
       const { context, content } = current;
       return NotebookActions.runAndAdvance(

@@ -56,7 +56,7 @@ export class TableOfContentsRegistry {
    */
   add(generator: TableOfContentsRegistry.IGenerator): void {
     if (generator.collapseChanged) {
-      // If there is a collapseChanged for a given generator, propogate the arguments through the registry's signal
+      // If there is a collapseChanged for a given generator, propagate the arguments through the registry's signal
       generator.collapseChanged.connect(
         (
           sender: TableOfContentsRegistry.IGenerator<Widget>,
@@ -187,6 +187,6 @@ export namespace TableOfContentsRegistry {
      * @param widget - widget
      * @returns list of headings
      */
-    generate(widget: W): IHeading[];
+    generate(widget: W, options?: IOptionsManager): IHeading[];
   }
 }

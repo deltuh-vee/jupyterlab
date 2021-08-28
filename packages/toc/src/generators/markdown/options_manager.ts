@@ -18,6 +18,11 @@ interface IOptions {
   numbering: boolean;
 
   /**
+   * Boolean indicating whether h1 headers should be numbered.
+   */
+  numberingH1: boolean;
+
+  /**
    * HTML sanitizer.
    */
   sanitizer: ISanitizer;
@@ -44,6 +49,7 @@ class OptionsManager extends Registry.IOptionsManager {
   constructor(widget: TableOfContents, options: IOptions) {
     super();
     this._numbering = options.numbering;
+    this._numberingH1 = options.numberingH1;
     this._widget = widget;
     this.translator = options.translator || nullTranslator;
     this.sanitizer = options.sanitizer;
@@ -62,8 +68,22 @@ class OptionsManager extends Registry.IOptionsManager {
     this._widget.update();
   }
 
-  get numbering() {
+  get numbering(): boolean {
     return this._numbering;
+  }
+
+  /**
+   * Gets/sets ToC generator numbering h1 headers.
+   */
+  set numberingH1(value: boolean) {
+    if (this._numberingH1 != value) {
+      this._numberingH1 = value;
+      this._widget.update();
+    }
+  }
+
+  get numberingH1(): boolean {
+    return this._numberingH1;
   }
 
   /**
@@ -75,13 +95,15 @@ class OptionsManager extends Registry.IOptionsManager {
    *
    * @param numbering - boolean indicating whether to number items
    */
-  initializeOptions(numbering: boolean) {
+  initializeOptions(numbering: boolean, numberingH1: boolean): void {
     this._numbering = numbering;
+    this._numberingH1 = numberingH1;
     this._widget.update();
   }
 
   translator: ITranslator;
   private _numbering: boolean;
+  private _numberingH1: boolean;
   private _widget: TableOfContents;
 }
 

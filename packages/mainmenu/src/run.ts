@@ -1,13 +1,14 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
+import { IRankedMenu, RankedMenu } from '@jupyterlab/ui-components';
 import { Widget } from '@lumino/widgets';
-import { IJupyterLabMenu, IMenuExtender, JupyterLabMenu } from './labmenu';
+import { IMenuExtender } from './tokens';
 
 /**
  * An interface for a Run menu.
  */
-export interface IRunMenu extends IJupyterLabMenu {
+export interface IRunMenu extends IRankedMenu {
   /**
    * A set storing ICodeRunner for the Run menu.
    *
@@ -20,11 +21,11 @@ export interface IRunMenu extends IJupyterLabMenu {
 /**
  * An extensible Run menu for the application.
  */
-export class RunMenu extends JupyterLabMenu implements IRunMenu {
+export class RunMenu extends RankedMenu implements IRunMenu {
   /**
    * Construct the run menu.
    */
-  constructor(options: IJupyterLabMenu.IOptions) {
+  constructor(options: IRankedMenu.IOptions) {
     super(options);
     this.codeRunners = new Set<IRunMenu.ICodeRunner<Widget>>();
   }
@@ -56,26 +57,50 @@ export namespace IRunMenu {
    */
   export interface ICodeRunner<T extends Widget> extends IMenuExtender<T> {
     /**
+     * Return the caption associated to the `run` function.
+     *
+     * This function receives the number of items `n` to be able to provided
+     * correct pluralized forms of translations.
+     */
+    runCaption?: (n: number) => string;
+
+    /**
      * Return the label associated to the `run` function.
      *
      * This function receives the number of items `n` to be able to provided
-     * correct pluralized forms of tranlsations.
+     * correct pluralized forms of translations.
      */
     runLabel?: (n: number) => string;
 
     /**
-     * Return the label associated to the `runAllLabel` function.
+     * Return the caption associated to the `runAll` function.
      *
      * This function receives the number of items `n` to be able to provided
-     * correct pluralized forms of tranlsations.
+     * correct pluralized forms of translations.
+     */
+    runAllCaption?: (n: number) => string;
+
+    /**
+     * Return the label associated to the `runAll` function.
+     *
+     * This function receives the number of items `n` to be able to provided
+     * correct pluralized forms of translations.
      */
     runAllLabel?: (n: number) => string;
 
     /**
-     * Return the label associated to the `restartAndRunAllLabel` function.
+     * Return the caption associated to the `restartAndRunAll` function.
      *
      * This function receives the number of items `n` to be able to provided
-     * correct pluralized forms of tranlsations.
+     * correct pluralized forms of translations.
+     */
+    restartAndRunAllCaption?: (n: number) => string;
+
+    /**
+     * Return the label associated to the `restartAndRunAll` function.
+     *
+     * This function receives the number of items `n` to be able to provided
+     * correct pluralized forms of translations.
      */
     restartAndRunAllLabel?: (n: number) => string;
 

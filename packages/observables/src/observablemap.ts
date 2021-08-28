@@ -139,7 +139,7 @@ export namespace IObservableMap {
 }
 
 /**
- * A concrete implementation of IObservbleMap<T>.
+ * A concrete implementation of IObservableMap<T>.
  */
 export class ObservableMap<T> implements IObservableMap<T> {
   /**
@@ -348,7 +348,7 @@ namespace Private {
   /**
    * The default strict equality item comparator.
    */
-  export function itemCmp(first: any, second: any): boolean {
+  export function itemCmp<T>(first: T, second: T): boolean {
     return first === second;
   }
 }

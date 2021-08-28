@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-types */
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 // / <reference types="codemirror"/>
@@ -41,6 +42,7 @@ import 'codemirror/addon/search/searchcursor';
 import 'codemirror/addon/selection/active-line';
 import 'codemirror/addon/selection/mark-selection';
 import 'codemirror/addon/selection/selection-pointer';
+import 'codemirror/addon/edit/trailingspace.js';
 import 'codemirror/keymap/emacs.js';
 import 'codemirror/keymap/sublime.js';
 import { CodemirrorBinding } from 'y-codemirror';
@@ -339,7 +341,7 @@ export class CodeMirrorEditor implements CodeEditor.IEditor {
   /**
    * Set config options for the editor.
    *
-   * This method is prefered when setting several options. The
+   * This method is preferred when setting several options. The
    * options are set within an operation, which only performs
    * the costly update at the end, and not after every option
    * is set.
@@ -510,9 +512,9 @@ export class CodeMirrorEditor implements CodeEditor.IEditor {
   getRange(
     from: CodeMirror.Position,
     to: CodeMirror.Position,
-    seperator?: string
+    separator?: string
   ): string {
-    return this._editor.getDoc().getRange(from, to, seperator);
+    return this._editor.getDoc().getRange(from, to, separator);
   }
 
   /**
@@ -957,7 +959,7 @@ export class CodeMirrorEditor implements CodeEditor.IEditor {
     switch (args.type) {
       case 'insert': {
         const pos = doc.posFromIndex(args.start);
-        // Replace the range, including a '+input' orign,
+        // Replace the range, including a '+input' origin,
         // which indicates that CodeMirror may merge changes
         // for undo/redo purposes.
         doc.replaceRange(args.value, pos, pos, '+input');
@@ -966,7 +968,7 @@ export class CodeMirrorEditor implements CodeEditor.IEditor {
       case 'remove': {
         const from = doc.posFromIndex(args.start);
         const to = doc.posFromIndex(args.end);
-        // Replace the range, including a '+input' orign,
+        // Replace the range, including a '+input' origin,
         // which indicates that CodeMirror may merge changes
         // for undo/redo purposes.
         doc.replaceRange('', from, to, '+input');
@@ -1379,7 +1381,7 @@ export namespace CodeMirrorEditor {
   export function addCommand(
     name: string,
     command: (cm: CodeMirror.Editor) => void
-  ) {
+  ): void {
     (CodeMirror.commands as any)[name] = command;
   }
 }
@@ -1463,7 +1465,7 @@ namespace Private {
   }
 
   /**
-   * Delete spaces to the previous tab stob in a codemirror editor.
+   * Delete spaces to the previous tab stop in a codemirror editor.
    */
   export function delSpaceToPrevTabStop(cm: CodeMirror.Editor): void {
     const doc = cm.getDoc();
@@ -1530,6 +1532,9 @@ namespace Private {
   ): void {
     const el = editor.getWrapperElement();
     switch (option) {
+      case 'cursorBlinkRate':
+        (editor.setOption as any)(option, value);
+        break;
       case 'lineWrap': {
         const lineWrapping = value === 'off' ? false : true;
         const lines = el.querySelector('.CodeMirror-lines') as HTMLDivElement;
@@ -1599,6 +1604,9 @@ namespace Private {
       case 'codeFolding':
         (editor.setOption as any)('foldGutter', value);
         editor.setOption('gutters', getActiveGutters(config));
+        break;
+      case 'showTrailingSpace':
+        (editor.setOption as any)(option, value);
         break;
       default:
         (editor.setOption as any)(option, value);

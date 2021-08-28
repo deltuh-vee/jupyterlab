@@ -31,7 +31,7 @@ export class SearchInstance implements IDisposable {
       overlayState: this._displayState,
       onCaseSensitiveToggled: this._onCaseSensitiveToggled.bind(this),
       onRegexToggled: this._onRegexToggled.bind(this),
-      onHightlightNext: this._highlightNext.bind(this),
+      onHighlightNext: this._highlightNext.bind(this),
       onHighlightPrevious: this._highlightPrevious.bind(this),
       onStartQuery: this._startQuery.bind(this),
       onReplaceCurrent: this._replaceCurrent.bind(this),
@@ -77,14 +77,14 @@ export class SearchInstance implements IDisposable {
   /**
    * The search widget.
    */
-  get searchWidget() {
+  get searchWidget(): Widget {
     return this._searchWidget;
   }
 
   /**
    * The search provider.
    */
-  get provider() {
+  get provider(): ISearchProvider<Widget> {
     return this._activeProvider;
   }
 
@@ -155,7 +155,7 @@ export class SearchInstance implements IDisposable {
   /**
    * Dispose of the resources held by the search instance.
    */
-  dispose() {
+  dispose(): void {
     if (this.isDisposed) {
       return;
     }
@@ -188,7 +188,7 @@ export class SearchInstance implements IDisposable {
   /**
    * Display search widget.
    */
-  _displaySearchWidget() {
+  _displaySearchWidget(): void {
     if (!this._searchWidget.isAttached) {
       Widget.attach(this._searchWidget, this._widget.node);
     }

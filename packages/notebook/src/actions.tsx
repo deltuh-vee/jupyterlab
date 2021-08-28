@@ -33,6 +33,36 @@ import { Notebook } from './widget';
  */
 const JUPYTER_CELL_MIME = 'application/vnd.jupyter.cells';
 
+export class KernelError extends Error {
+  /**
+   * Exception name
+   */
+  readonly errorName: string;
+  /**
+   * Exception value
+   */
+  readonly errorValue: string;
+  /**
+   * Traceback
+   */
+  readonly traceback: string[];
+
+  /**
+   * Construct the kernel error.
+   */
+  constructor(content: KernelMessage.IExecuteReplyMsg['content']) {
+    const errorContent = content as KernelMessage.IReplyErrorContent;
+    const errorName = errorContent.ename;
+    const errorValue = errorContent.evalue;
+    super(`KernelReplyNotOK: ${errorName} ${errorValue}`);
+
+    this.errorName = errorName;
+    this.errorValue = errorValue;
+    this.traceback = errorContent.traceback;
+    Object.setPrototypeOf(this, KernelError.prototype);
+  }
+}
+
 /**
  * A collection of actions that run against notebooks.
  *
@@ -44,10 +74,38 @@ const JUPYTER_CELL_MIME = 'application/vnd.jupyter.cells';
  */
 export class NotebookActions {
   /**
-   * A signal that emits whenever a cell is run.
+   * A signal that emits whenever a cell completes execution.
    */
-  static get executed(): ISignal<any, { notebook: Notebook; cell: Cell }> {
+  static get executed(): ISignal<
+    any,
+    {
+      notebook: Notebook;
+      cell: Cell;
+      success: boolean;
+      error?: KernelError | null;
+    }
+  > {
     return Private.executed;
+  }
+
+  /**
+   * A signal that emits whenever a cell execution is scheduled.
+   */
+  static get executionScheduled(): ISignal<
+    any,
+    { notebook: Notebook; cell: Cell }
+  > {
+    return Private.executionScheduled;
+  }
+
+  /**
+   * A signal that emits when one notebook's cells are all executed.
+   */
+  static get selectionExecuted(): ISignal<
+    any,
+    { notebook: Notebook; lastCell: Cell }
+  > {
+    return Private.selectionExecuted;
   }
 
   /**
@@ -71,16 +129,16 @@ export namespace NotebookActions {
   /**
    * Split the active cell into two or more cells.
    *
-   * @param widget - The target notebook widget.
+   * @param notebook The target notebook widget.
    *
    * #### Notes
    * It will preserve the existing mode.
    * The last cell will be activated if no selection is found.
-   * If text was selected, the cell cotaining the selection will
-     be activated.
+   * If text was selected, the cell containing the selection will
+   * be activated.
    * The existing selection will be cleared.
-   * The activated cell will have focus and the cursor will move
-     to the end of the cell.
+   * The activated cell will have focus and the cursor will
+   * remain in the initial position.
    * The leading whitespace in the second cell will be removed.
    * If there is no content, two empty cells will be created.
    * Both cells will have the same type as the original cell.
@@ -157,9 +215,6 @@ export namespace NotebookActions {
     notebook.activeCellIndex = index + clones.length - activeCellDelta;
     const focusedEditor = notebook.activeCell.editor;
     focusedEditor.focus();
-
-    // Move to the end of the cell that now contains the cursor
-    focusedEditor.setCursorPosition({ line: editor.lineCount, column: 0 });
 
     Private.handleState(notebook, state);
   }
@@ -504,7 +559,9 @@ export namespace NotebookActions {
         {}
       );
 
-      model.cells.push(cell);
+      // Do not use push here, as we want an widget insertion
+      // to make sure no placeholder widget is rendered.
+      model.cells.insert(notebook.widgets.length, cell);
       notebook.activeCellIndex++;
       notebook.mode = 'edit';
     } else {
@@ -863,7 +920,7 @@ export namespace NotebookActions {
   /**
    * Deselect all of the cells of the notebook.
    *
-   * @param notebook - the targe notebook widget.
+   * @param notebook - the target notebook widget.
    */
   export function deselectAll(notebook: Notebook): void {
     if (!notebook.model || !notebook.activeCell) {
@@ -1365,7 +1422,7 @@ export namespace NotebookActions {
    * There will always be one blank space after the header.
    * The cells will be unrendered.
    */
-  export function setMarkdownHeader(notebook: Notebook, level: number) {
+  export function setMarkdownHeader(notebook: Notebook, level: number): void {
     if (!notebook.model || !notebook.activeCell) {
       return;
     }
@@ -1472,6 +1529,38 @@ export namespace NotebookActions {
   }
 
   /**
+   * Finds the next heading that isn't a child of the given markdown heading.
+   * @param cell - "Child" cell that has become the active cell
+   * @param notebook - The target notebook widget.
+   */
+  export function findNextParentHeading(
+    cell: Cell,
+    notebook: Notebook
+  ): number {
+    let index = findIndex(
+      notebook.widgets,
+      (possibleCell: Cell, index: number) => {
+        return cell.model.id === possibleCell.model.id;
+      }
+    );
+    if (index === -1) {
+      return -1;
+    }
+    let childHeaderInfo = getHeadingInfo(cell);
+    for (index = index + 1; index < notebook.widgets.length; index++) {
+      let hInfo = getHeadingInfo(notebook.widgets[index]);
+      if (
+        hInfo.isHeading &&
+        hInfo.headingLevel <= childHeaderInfo.headingLevel
+      ) {
+        return index;
+      }
+    }
+    // else no parent header found. return the index of the last cell
+    return notebook.widgets.length;
+  }
+
+  /**
    * Set the given cell and ** all "child" cells **
    * to the given collapse / expand if cell is
    * a markdown header.
@@ -1497,11 +1586,11 @@ export namespace NotebookActions {
     if (!notebook.widgets.length) {
       return which + 1;
     }
-    let selectedheadingInfo = NotebookActions.getHeadingInfo(cell);
+    let selectedHeadingInfo = NotebookActions.getHeadingInfo(cell);
     if (
       cell.isHidden ||
       !(cell instanceof MarkdownCell) ||
-      !selectedheadingInfo.isHeading
+      !selectedHeadingInfo.isHeading
     ) {
       // otherwise collapsing and uncollapsing already hidden stuff can
       // cause some funny looking bugs.
@@ -1513,10 +1602,10 @@ export namespace NotebookActions {
     let cellNum;
     for (cellNum = which + 1; cellNum < notebook.widgets.length; cellNum++) {
       let subCell = notebook.widgets[cellNum];
-      let subCellheadingInfo = NotebookActions.getHeadingInfo(subCell);
+      let subCellHeadingInfo = NotebookActions.getHeadingInfo(subCell);
       if (
-        subCellheadingInfo.isHeading &&
-        subCellheadingInfo.headingLevel <= selectedheadingInfo.headingLevel
+        subCellHeadingInfo.isHeading &&
+        subCellHeadingInfo.headingLevel <= selectedHeadingInfo.headingLevel
       ) {
         // then reached an equivalent or higher heading level than the
         // original the end of the collapse.
@@ -1525,8 +1614,8 @@ export namespace NotebookActions {
       }
       if (
         localCollapsed &&
-        subCellheadingInfo.isHeading &&
-        subCellheadingInfo.headingLevel <= localCollapsedLevel
+        subCellHeadingInfo.isHeading &&
+        subCellHeadingInfo.headingLevel <= localCollapsedLevel
       ) {
         // then reached the end of the local collapsed, so unset NotebookActions.
         localCollapsed = false;
@@ -1539,9 +1628,9 @@ export namespace NotebookActions {
         continue;
       }
 
-      if (subCellheadingInfo.collapsed && subCellheadingInfo.isHeading) {
+      if (subCellHeadingInfo.collapsed && subCellHeadingInfo.isHeading) {
         localCollapsed = true;
-        localCollapsedLevel = subCellheadingInfo.headingLevel;
+        localCollapsedLevel = subCellHeadingInfo.headingLevel;
         // but don't collapse the locally collapsed heading, so continue to
         // expand the heading. This will get noticed in the next round.
       }
@@ -1638,17 +1727,21 @@ export namespace NotebookActions {
     const trustMessage = (
       <p>
         {trans.__(
-          'A trusted Jupyter notebook may execute hidden malicious code when you openit.'
+          'A trusted Jupyter notebook may execute hidden malicious code when you open it.'
         )}
         <br />
         {trans.__(
           'Selecting trust will re-render this notebook in a trusted state.'
         )}
         <br />
-        {trans.__(
-          'For more information, see the <a href="https://jupyter-server.readthedocs.io/en/stable/operators/security.html">%1</a>',
-          trans.__('Jupyter security documentation')
-        )}
+        {trans.__('For more information, see')}{' '}
+        <a
+          href="https://jupyter-server.readthedocs.io/en/stable/operators/security.html"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {trans.__('the Jupyter security documentation')}
+        </a>
       </p>
     );
 
@@ -1681,11 +1774,33 @@ export namespace NotebookActions {
  */
 namespace Private {
   /**
-   * A signal that emits whenever a cell is run.
+   * A signal that emits whenever a cell completes execution.
    */
-  export const executed = new Signal<any, { notebook: Notebook; cell: Cell }>(
-    {}
-  );
+  export const executed = new Signal<
+    any,
+    {
+      notebook: Notebook;
+      cell: Cell;
+      success: boolean;
+      error?: KernelError | null;
+    }
+  >({});
+
+  /**
+   * A signal that emits whenever a cell execution is scheduled.
+   */
+  export const executionScheduled = new Signal<
+    any,
+    { notebook: Notebook; cell: Cell }
+  >({});
+
+  /**
+   * A signal that emits when one notebook's cells are all executed.
+   */
+  export const selectionExecuted = new Signal<
+    any,
+    { notebook: Notebook; lastCell: Cell }
+  >({});
 
   /**
    * The interface for a widget state.
@@ -1800,14 +1915,17 @@ namespace Private {
         if (notebook.isDisposed) {
           return false;
         }
-
+        selectionExecuted.emit({
+          notebook,
+          lastCell: notebook.widgets[lastIndex]
+        });
         // Post an update request.
         notebook.update();
 
         return results.every(result => result);
       })
       .catch(reason => {
-        if (reason.message === 'KernelReplyNotOK') {
+        if (reason.message.startsWith('KernelReplyNotOK')) {
           selected.map(cell => {
             // Remove '*' prompt from cells that didn't execute
             if (
@@ -1821,6 +1939,10 @@ namespace Private {
           throw reason;
         }
 
+        selectionExecuted.emit({
+          notebook,
+          lastCell: notebook.widgets[lastIndex]
+        });
         notebook.update();
 
         return false;
@@ -1838,12 +1960,11 @@ namespace Private {
   ): Promise<boolean> {
     translator = translator || nullTranslator;
     const trans = translator.load('jupyterlab');
-
     switch (cell.model.type) {
       case 'markdown':
         (cell as MarkdownCell).rendered = true;
         cell.inputHidden = false;
-        executed.emit({ notebook, cell });
+        executed.emit({ notebook, cell, success: true });
         break;
       case 'code':
         if (sessionContext) {
@@ -1858,17 +1979,8 @@ namespace Private {
             });
             break;
           }
-          if (sessionContext.pendingInput) {
-            void showDialog({
-              title: trans.__('Waiting on User Input'),
-              body: trans.__(
-                'Did not run selected cell because there is a cell waiting on input! Submit your input and try again.'
-              ),
-              buttons: [Dialog.okButton({ label: trans.__('Ok') })]
-            });
-            return Promise.resolve(false);
-          }
           const deletedCells = notebook.model?.deletedCells ?? [];
+          executionScheduled.emit({ notebook, cell });
           return CodeCell.execute(cell as CodeCell, sessionContext, {
             deletedCells,
             recordTiming: notebook.notebookConfig.recordTiming
@@ -1882,7 +1994,6 @@ namespace Private {
               if (!reply) {
                 return true;
               }
-
               if (reply.content.status === 'ok') {
                 const content = reply.content;
 
@@ -1892,18 +2003,19 @@ namespace Private {
 
                 return true;
               } else {
-                throw new Error('KernelReplyNotOK');
+                throw new KernelError(reply.content);
               }
             })
             .catch(reason => {
               if (cell.isDisposed || reason.message.startsWith('Canceled')) {
                 return false;
               }
+              executed.emit({ notebook, cell, success: false, error: reason });
               throw reason;
             })
             .then(ran => {
               if (ran) {
-                executed.emit({ notebook, cell });
+                executed.emit({ notebook, cell, success: true });
               }
 
               return ran;
@@ -2120,7 +2232,7 @@ namespace Private {
   /**
    * Set the markdown header level of a cell.
    */
-  export function setMarkdownHeader(cell: ICellModel, level: number) {
+  export function setMarkdownHeader(cell: ICellModel, level: number): void {
     // Remove existing header or leading white space.
     let source = cell.value.text;
     const regex = /^(#+\s*)|^(\s*)/;

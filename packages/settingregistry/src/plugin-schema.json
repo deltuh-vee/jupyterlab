@@ -17,6 +17,25 @@
           },
           "type": "array",
           "default": []
+        },
+        "context": {
+          "title": "The application context menu.",
+          "description": "List of context menu items.",
+          "items": {
+            "allOf": [
+              { "$ref": "#/definitions/menuItem" },
+              {
+                "properties": {
+                  "selector": {
+                    "description": "The CSS selector for the context menu item.",
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          },
+          "type": "array",
+          "default": []
         }
       },
       "additionalProperties": false
@@ -44,6 +63,19 @@
       "type": "array",
       "default": []
     },
+    "jupyter.lab.toolbars": {
+      "properties": {
+        "^\\w[\\w-\\.]*$": {
+          "items": {
+            "$ref": "#/definitions/toolbarItem"
+          },
+          "type": "array",
+          "default": []
+        }
+      },
+      "type": "object",
+      "default": {}
+    },
     "jupyter.lab.transform": {
       "type": "boolean",
       "default": false
@@ -53,10 +85,16 @@
     "menu": {
       "properties": {
         "disabled": {
+          "description": "Whether the menu is disabled or not",
           "type": "boolean",
           "default": false
         },
+        "icon": {
+          "description": "Menu icon id",
+          "type": "string"
+        },
         "id": {
+          "description": "Menu unique id",
           "oneOf": [
             {
               "type": "string",
@@ -76,15 +114,24 @@
           ]
         },
         "items": {
+          "description": "Menu items",
           "type": "array",
           "items": {
             "$ref": "#/definitions/menuItem"
           }
         },
         "label": {
+          "description": "Menu label",
           "type": "string"
         },
+        "mnemonic": {
+          "description": "Mnemonic index for the label",
+          "type": "number",
+          "minimum": -1,
+          "default": -1
+        },
         "rank": {
+          "description": "Menu rank",
           "type": "number",
           "minimum": 0
         }
@@ -95,21 +142,26 @@
     "menuItem": {
       "properties": {
         "args": {
+          "description": "Command arguments",
           "type": "object"
         },
         "command": {
+          "description": "Command id",
           "type": "string"
         },
         "disabled": {
+          "description": "Whether the item is disabled or not",
           "type": "boolean",
           "default": false
         },
         "type": {
+          "description": "Item type",
           "type": "string",
           "enum": ["command", "submenu", "separator"],
           "default": "command"
         },
         "rank": {
+          "description": "Item rank",
           "type": "number",
           "minimum": 0
         },
@@ -150,6 +202,52 @@
         }
       },
       "required": ["command", "keys", "selector"],
+      "type": "object"
+    },
+    "toolbarItem": {
+      "properties": {
+        "name": {
+          "title": "Unique name",
+          "type": "string"
+        },
+        "args": {
+          "title": "Command arguments",
+          "type": "object"
+        },
+        "command": {
+          "title": "Command id",
+          "type": "string",
+          "default": ""
+        },
+        "disabled": {
+          "title": "Whether the item is ignored or not",
+          "type": "boolean",
+          "default": false
+        },
+        "icon": {
+          "title": "Item icon id",
+          "description": "If defined, it will override the command icon",
+          "type": "string"
+        },
+        "label": {
+          "title": "Item label",
+          "description": "If defined, it will override the command label",
+          "type": "string"
+        },
+        "type": {
+          "title": "Item type",
+          "type": "string",
+          "enum": ["command", "spacer"]
+        },
+        "rank": {
+          "title": "Item rank",
+          "type": "number",
+          "minimum": 0,
+          "default": 50
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false,
       "type": "object"
     }
   }

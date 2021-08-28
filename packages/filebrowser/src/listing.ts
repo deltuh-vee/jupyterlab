@@ -166,7 +166,7 @@ const MULTI_SELECTED_CLASS = 'jp-mod-multiSelected';
 const RUNNING_CLASS = 'jp-mod-running';
 
 /**
- * The class name added for a decending sort.
+ * The class name added for a descending sort.
  */
 const DESCENDING_CLASS = 'jp-mod-descending';
 
@@ -605,7 +605,7 @@ export class DirListing extends Widget {
   /**
    * Clear the selected items.
    */
-  clearSelectedItems() {
+  clearSelectedItems(): void {
     this.selection = Object.create(null);
   }
 
@@ -656,13 +656,13 @@ export class DirListing extends Widget {
         this._evtMousemove(event as MouseEvent);
         break;
       case 'keydown':
-        this._evtKeydown(event as KeyboardEvent);
+        this.evtKeydown(event as KeyboardEvent);
         break;
       case 'click':
         this._evtClick(event as MouseEvent);
         break;
       case 'dblclick':
-        this._evtDblClick(event as MouseEvent);
+        this.evtDblClick(event as MouseEvent);
         break;
       case 'dragenter':
       case 'dragover':
@@ -675,22 +675,22 @@ export class DirListing extends Widget {
         break;
       case 'drop':
         this.removeClass('jp-mod-native-drop');
-        this._evtNativeDrop(event as DragEvent);
+        this.evtNativeDrop(event as DragEvent);
         break;
       case 'scroll':
         this._evtScroll(event as MouseEvent);
         break;
       case 'lm-dragenter':
-        this._evtDragEnter(event as IDragEvent);
+        this.evtDragEnter(event as IDragEvent);
         break;
       case 'lm-dragleave':
-        this._evtDragLeave(event as IDragEvent);
+        this.evtDragLeave(event as IDragEvent);
         break;
       case 'lm-dragover':
-        this._evtDragOver(event as IDragEvent);
+        this.evtDragOver(event as IDragEvent);
         break;
       case 'lm-drop':
-        this._evtDrop(event as IDragEvent);
+        this.evtDrop(event as IDragEvent);
         break;
       default:
         break;
@@ -848,13 +848,16 @@ export class DirListing extends Widget {
     this._prevPath = this._model.path;
   }
 
-  onResize(msg: Widget.ResizeMessage) {
+  onResize(msg: Widget.ResizeMessage): void {
     const { width } =
       msg.width === -1 ? this.node.getBoundingClientRect() : msg;
     this.toggleClass('jp-DirListing-narrow', width < 250);
   }
 
-  setColumnVisibility(name: DirListing.ToggleableColumn, visible: boolean) {
+  setColumnVisibility(
+    name: DirListing.ToggleableColumn,
+    visible: boolean
+  ): void {
     if (visible) {
       this._hiddenColumns.delete(name);
     } else {
@@ -1021,7 +1024,7 @@ export class DirListing extends Widget {
   /**
    * Handle the `'keydown'` event for the widget.
    */
-  private _evtKeydown(event: KeyboardEvent): void {
+  protected evtKeydown(event: KeyboardEvent): void {
     switch (event.keyCode) {
       case 13: {
         // Enter
@@ -1081,7 +1084,7 @@ export class DirListing extends Widget {
   /**
    * Handle the `'dblclick'` event for the widget.
    */
-  private _evtDblClick(event: MouseEvent): void {
+  protected evtDblClick(event: MouseEvent): void {
     // Do nothing if it's not a left mouse press.
     if (event.button !== 0) {
       return;
@@ -1115,7 +1118,7 @@ export class DirListing extends Widget {
   /**
    * Handle the `drop` event for the widget.
    */
-  private _evtNativeDrop(event: DragEvent): void {
+  protected evtNativeDrop(event: DragEvent): void {
     const files = event.dataTransfer?.files;
     if (!files || files.length === 0) {
       return;
@@ -1146,7 +1149,7 @@ export class DirListing extends Widget {
   /**
    * Handle the `'lm-dragenter'` event for the widget.
    */
-  private _evtDragEnter(event: IDragEvent): void {
+  protected evtDragEnter(event: IDragEvent): void {
     if (event.mimeData.hasData(CONTENTS_MIME)) {
       const index = Private.hitTestNodes(this._items, event);
       if (index === -1) {
@@ -1166,7 +1169,7 @@ export class DirListing extends Widget {
   /**
    * Handle the `'lm-dragleave'` event for the widget.
    */
-  private _evtDragLeave(event: IDragEvent): void {
+  protected evtDragLeave(event: IDragEvent): void {
     event.preventDefault();
     event.stopPropagation();
     const dropTarget = DOMUtils.findElement(this.node, DROP_TARGET_CLASS);
@@ -1178,7 +1181,7 @@ export class DirListing extends Widget {
   /**
    * Handle the `'lm-dragover'` event for the widget.
    */
-  private _evtDragOver(event: IDragEvent): void {
+  protected evtDragOver(event: IDragEvent): void {
     event.preventDefault();
     event.stopPropagation();
     event.dropAction = event.proposedAction;
@@ -1193,7 +1196,7 @@ export class DirListing extends Widget {
   /**
    * Handle the `'lm-drop'` event for the widget.
    */
-  private _evtDrop(event: IDragEvent): void {
+  protected evtDrop(event: IDragEvent): void {
     event.preventDefault();
     event.stopPropagation();
     clearTimeout(this._selectTimer);
@@ -1520,7 +1523,7 @@ export class DirListing extends Widget {
         }
         if (!isValidFileName(newName)) {
           void showErrorMessage(
-            this._trans.__('showErrorMessage', 'Rename Error'),
+            this._trans.__('Rename Error'),
             Error(
               this._trans._p(
                 'showErrorMessage',

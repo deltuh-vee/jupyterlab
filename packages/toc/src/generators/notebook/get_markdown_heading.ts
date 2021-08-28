@@ -4,6 +4,7 @@
 import { Cell } from '@jupyterlab/cells';
 import { generateNumbering } from '../../utils/generate_numbering';
 import { INotebookHeading } from '../../utils/headings';
+import { INumberingDictionary } from '../../utils/numbering_dictionary';
 import { parseHeading } from '../../utils/parse_heading';
 
 /**
@@ -30,12 +31,12 @@ type onClickFactory = (line: number) => () => void;
 function getMarkdownHeadings(
   text: string,
   onClick: onClickFactory,
-  dict: any,
+  dict: INumberingDictionary,
   lastLevel: number,
   cellRef: Cell,
   index: number = -1
 ): INotebookHeading[] {
-  const clbk = onClick(0);
+  const callback = onClick(0);
   let headings: INotebookHeading[] = [];
   if (index === -1) {
     console.warn(
@@ -49,7 +50,7 @@ function getMarkdownHeadings(
         text: heading.text,
         level: heading.level,
         numbering: generateNumbering(dict, heading.level),
-        onClick: clbk,
+        onClick: callback,
         type: 'header',
         cellRef: cellRef,
         hasChild: false,
@@ -59,7 +60,7 @@ function getMarkdownHeadings(
       headings.push({
         text: text,
         level: lastLevel + 1,
-        onClick: clbk,
+        onClick: callback,
         type: 'markdown',
         cellRef: cellRef,
         hasChild: false,

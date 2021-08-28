@@ -2,38 +2,20 @@
 // Distributed under the terms of the Modified BSD License.
 
 import { JupyterFrontEnd } from '@jupyterlab/application';
-
-import {
-  ISessionContext,
-  SessionContext,
-  ToolbarButton
-} from '@jupyterlab/apputils';
-
+import { ISessionContext, SessionContext } from '@jupyterlab/apputils';
 import { ConsolePanel } from '@jupyterlab/console';
-
 import { IChangedArgs } from '@jupyterlab/coreutils';
-
 import { DocumentWidget } from '@jupyterlab/docregistry';
-
 import { FileEditor } from '@jupyterlab/fileeditor';
-
 import { NotebookPanel } from '@jupyterlab/notebook';
-
 import { Kernel, KernelMessage, Session } from '@jupyterlab/services';
-
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
-
-import { bugIcon, Switch } from '@jupyterlab/ui-components';
-
+import { bugIcon, Switch, ToolbarButton } from '@jupyterlab/ui-components';
 import { Debugger } from './debugger';
-
-import { IDebugger } from './tokens';
-
 import { ConsoleHandler } from './handlers/console';
-
 import { FileHandler } from './handlers/file';
-
 import { NotebookHandler } from './handlers/notebook';
+import { IDebugger } from './tokens';
 
 /**
  * Add a bug icon to the widget toolbar to enable and disable debugging.
@@ -123,11 +105,11 @@ export class DebuggerHandler {
       delete this._kernelChangedHandlers[widget.id];
       delete this._statusChangedHandlers[widget.id];
       delete this._iopubMessageHandlers[widget.id];
-      return this._update(widget, connection);
+      return this.updateWidget(widget, connection);
     }
 
     const kernelChanged = (): void => {
-      void this._update(widget, connection);
+      void this.updateWidget(widget, connection);
     };
     const kernelChangedHandler = this._kernelChangedHandlers[widget.id];
 
@@ -143,7 +125,7 @@ export class DebuggerHandler {
     ): void => {
       // FIXME-TRANS: Localizable?
       if (status.endsWith('restarting')) {
-        void this._update(widget, connection);
+        void this.updateWidget(widget, connection);
       }
     };
     const statusChangedHandler = this._statusChangedHandlers[widget.id];
@@ -174,7 +156,7 @@ export class DebuggerHandler {
     connection.iopubMessage.connect(iopubMessage);
     this._iopubMessageHandlers[widget.id] = iopubMessage;
 
-    return this._update(widget, connection);
+    return this.updateWidget(widget, connection);
   }
 
   /**
@@ -212,7 +194,7 @@ export class DebuggerHandler {
    * @param widget The widget to update.
    * @param connection The session connection.
    */
-  private async _update(
+  async updateWidget(
     widget: DebuggerHandler.SessionWidget[DebuggerHandler.SessionType],
     connection: Session.ISessionConnection | null
   ): Promise<void> {

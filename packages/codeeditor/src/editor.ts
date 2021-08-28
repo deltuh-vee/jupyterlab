@@ -276,7 +276,7 @@ export namespace CodeEditor {
     /**
      * We update the modeldb store when the shared model changes.
      * To ensure that we don't run into infinite loops, we wrap this call in a "mutex".
-     * The "mutex" ensures that the wrapped code can only be executed by either the sharedModelChanged hander
+     * The "mutex" ensures that the wrapped code can only be executed by either the sharedModelChanged handler
      * or the modelDB change handler.
      */
     protected _onSharedModelChanged(
@@ -712,6 +712,13 @@ export namespace CodeEditor {
    */
   export interface IConfig {
     /**
+     * Half-period in milliseconds used for cursor blinking.
+     * By setting this to zero, blinking can be disabled.
+     * A negative value hides the cursor entirely.
+     */
+    cursorBlinkRate: number;
+
+    /**
      * User preferred font family for text editors.
      */
     fontFamily: string | null;
@@ -781,15 +788,21 @@ export namespace CodeEditor {
     rulers: Array<number>;
 
     /**
-     * Wheter to allow code folding
+     * Whether to allow code folding
      */
     codeFolding: boolean;
+
+    /**
+     * Whether to highlight trailing whitespace
+     */
+    showTrailingSpace: boolean;
   }
 
   /**
    * The default configuration options for an editor.
    */
   export const defaultConfig: IConfig = {
+    cursorBlinkRate: 530,
     fontFamily: null,
     fontSize: null,
     lineHeight: null,
@@ -800,10 +813,11 @@ export namespace CodeEditor {
     tabSize: 4,
     insertSpaces: true,
     matchBrackets: true,
-    autoClosingBrackets: true,
+    autoClosingBrackets: false,
     handlePaste: true,
     rulers: [],
-    codeFolding: false
+    codeFolding: false,
+    showTrailingSpace: false
   };
 
   /**

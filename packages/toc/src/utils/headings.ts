@@ -84,8 +84,20 @@ interface INotebookHeading extends INumberedHeading {
 }
 
 /**
+ * Tests whether a heading is a notebook heading.
+ *
+ * @param heading - heading to test
+ * @returns boolean indicating whether a heading is a notebook heading
+ */
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+const isNotebookHeading = (heading: any): boolean => {
+  return heading.type !== undefined && heading.cellRef !== undefined;
+};
+
+/**
  * Exports.
  */
 export { IHeading };
 export { INumberedHeading };
 export { INotebookHeading };
+export { isNotebookHeading };

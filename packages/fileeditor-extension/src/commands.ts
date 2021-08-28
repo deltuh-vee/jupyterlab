@@ -1,7 +1,6 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { JupyterFrontEnd } from '@jupyterlab/application';
 import {
   Clipboard,
   ICommandPalette,
@@ -44,6 +43,8 @@ import {
   ReadonlyPartialJSONObject
 } from '@lumino/coreutils';
 
+const autoClosingBracketsNotebook = 'notebook:toggle-autoclosing-brackets';
+const autoClosingBracketsConsole = 'console:toggle-autoclosing-brackets';
 /**
  * The command IDs used by the fileeditor plugin.
  */
@@ -63,6 +64,9 @@ export namespace CommandIDs {
   export const matchBrackets = 'fileeditor:toggle-match-brackets';
 
   export const autoClosingBrackets = 'fileeditor:toggle-autoclosing-brackets';
+
+  export const autoClosingBracketsUniversal =
+    'fileeditor:toggle-autoclosing-brackets-universal';
 
   export const createConsole = 'fileeditor:create-console';
 
@@ -100,7 +104,35 @@ export interface IFileTypeData extends ReadonlyJSONObject {
  */
 export const FACTORY = 'Editor';
 
-let config: CodeEditor.IConfig = { ...CodeEditor.defaultConfig };
+const userSettings = [
+  'autoClosingBrackets',
+  'cursorBlinkRate',
+  'fontFamily',
+  'fontSize',
+  'lineHeight',
+  'lineNumbers',
+  'lineWrap',
+  'matchBrackets',
+  'readOnly',
+  'insertSpaces',
+  'tabSize',
+  'wordWrapColumn',
+  'rulers',
+  'codeFolding'
+];
+
+function filterUserSettings(config: CodeEditor.IConfig): CodeEditor.IConfig {
+  const filteredConfig = { ...config };
+  // Delete parts of the config that are not user settings (like handlePaste).
+  for (let k of Object.keys(config)) {
+    if (!userSettings.includes(k)) {
+      delete (config as any)[k];
+    }
+  }
+  return filteredConfig;
+}
+
+let config: CodeEditor.IConfig = filterUserSettings(CodeEditor.defaultConfig);
 
 /**
  * A utility class for adding commands and menu items,
@@ -144,10 +176,10 @@ export namespace Commands {
     settings: ISettingRegistry.ISettings,
     commands: CommandRegistry
   ): void {
-    config = {
+    config = filterUserSettings({
       ...CodeEditor.defaultConfig,
       ...(settings.get('editorConfig').composite as JSONObject)
-    };
+    });
 
     // Trigger a refresh of the rendered commands
     commands.notifyCommandChanged();
@@ -407,8 +439,10 @@ export namespace Commands {
     id: string
   ): void {
     commands.addCommand(CommandIDs.autoClosingBrackets, {
-      execute: () => {
-        config.autoClosingBrackets = !config.autoClosingBrackets;
+      execute: args => {
+        config.autoClosingBrackets = !!(
+          args['force'] ?? !config.autoClosingBrackets
+        );
         return settingRegistry
           .set(id, 'editorConfig', (config as unknown) as JSONObject)
           .catch((reason: Error) => {
@@ -417,6 +451,35 @@ export namespace Commands {
       },
       label: trans.__('Auto Close Brackets for Text Editor'),
       isToggled: () => config.autoClosingBrackets
+    });
+
+    commands.addCommand(CommandIDs.autoClosingBracketsUniversal, {
+      execute: () => {
+        const anyToggled =
+          commands.isToggled(CommandIDs.autoClosingBrackets) ||
+          commands.isToggled(autoClosingBracketsNotebook) ||
+          commands.isToggled(autoClosingBracketsConsole);
+        // if any auto closing brackets options is toggled, toggle both off
+        if (anyToggled) {
+          void commands.execute(CommandIDs.autoClosingBrackets, {
+            force: false
+          });
+          void commands.execute(autoClosingBracketsNotebook, { force: false });
+          void commands.execute(autoClosingBracketsConsole, { force: false });
+        } else {
+          // both are off, turn them on
+          void commands.execute(CommandIDs.autoClosingBrackets, {
+            force: true
+          });
+          void commands.execute(autoClosingBracketsNotebook, { force: true });
+          void commands.execute(autoClosingBracketsConsole, { force: true });
+        }
+      },
+      label: trans.__('Auto Close Brackets'),
+      isToggled: () =>
+        commands.isToggled(CommandIDs.autoClosingBrackets) ||
+        commands.isToggled(autoClosingBracketsNotebook) ||
+        commands.isToggled(autoClosingBracketsConsole)
     });
   }
 
@@ -873,10 +936,12 @@ export namespace Commands {
         ext
       })
       .then(model => {
-        return commands.execute('docmanager:open', {
-          path: model.path,
-          factory: FACTORY
-        });
+        if (model != undefined) {
+          return commands.execute('docmanager:open', {
+            path: model.path,
+            factory: FACTORY
+          });
+        }
       });
   }
 
@@ -1145,7 +1210,7 @@ export namespace Commands {
       menu.fileMenu.newMenu.addItem({
         command: CommandIDs.createNew,
         args: ext,
-        rank: 30
+        rank: 31
       });
     }
   }
@@ -1257,105 +1322,5 @@ export namespace Commands {
         }
       }
     } as IRunMenu.ICodeRunner<IDocumentWidget<FileEditor>>);
-  }
-
-  /**
-   * Wrapper function for adding the default items to the File Editor context menu
-   */
-  export function addContextMenuItems(app: JupyterFrontEnd): void {
-    addCreateConsoleToContextMenu(app);
-    addMarkdownPreviewToContextMenu(app);
-    addUndoCommandToContextMenu(app);
-    addRedoCommandToContextMenu(app);
-    addCutCommandToContextMenu(app);
-    addCopyCommandToContextMenu(app);
-    addPasteCommandToContextMenu(app);
-    addSelectAllCommandToContextMenu(app);
-  }
-
-  /**
-   * Add a Create Console item to the File Editor context menu
-   */
-  export function addCreateConsoleToContextMenu(app: JupyterFrontEnd): void {
-    app.contextMenu.addItem({
-      command: CommandIDs.createConsole,
-      selector: '.jp-FileEditor'
-    });
-  }
-
-  /**
-   * Add a Markdown Preview item to the File Editor context menu
-   */
-  export function addMarkdownPreviewToContextMenu(app: JupyterFrontEnd): void {
-    app.contextMenu.addItem({
-      command: CommandIDs.markdownPreview,
-      selector: '.jp-FileEditor'
-    });
-  }
-
-  /**
-   * Add a Undo item to the File Editor context menu
-   */
-  export function addUndoCommandToContextMenu(app: JupyterFrontEnd): void {
-    app.contextMenu.addItem({
-      command: CommandIDs.undo,
-      selector: '.jp-FileEditor',
-      rank: 1
-    });
-  }
-
-  /**
-   * Add a Redo item to the File Editor context menu
-   */
-  export function addRedoCommandToContextMenu(app: JupyterFrontEnd): void {
-    app.contextMenu.addItem({
-      command: CommandIDs.redo,
-      selector: '.jp-FileEditor',
-      rank: 2
-    });
-  }
-
-  /**
-   * Add a Cut item to the File Editor context menu
-   */
-  export function addCutCommandToContextMenu(app: JupyterFrontEnd): void {
-    app.contextMenu.addItem({
-      command: CommandIDs.cut,
-      selector: '.jp-FileEditor',
-      rank: 3
-    });
-  }
-
-  /**
-   * Add a Copy item to the File Editor context menu
-   */
-  export function addCopyCommandToContextMenu(app: JupyterFrontEnd): void {
-    app.contextMenu.addItem({
-      command: CommandIDs.copy,
-      selector: '.jp-FileEditor',
-      rank: 4
-    });
-  }
-
-  /**
-   * Add a Paste item to the File Editor context menu
-   */
-  export function addPasteCommandToContextMenu(app: JupyterFrontEnd): void {
-    app.contextMenu.addItem({
-      command: CommandIDs.paste,
-      selector: '.jp-FileEditor',
-      rank: 5
-    });
-  }
-
-  /**
-   * Add a Select All item to the File Editor context menu
-   */
-  export function addSelectAllCommandToContextMenu(app: JupyterFrontEnd): void {
-    app.contextMenu.addItem({
-      command: CommandIDs.selectAll,
-      selector: '.jp-FileEditor',
-      rank: 6
-    });
   }
 }
