@@ -19,9 +19,6 @@
       "path": "../docmanager"
     },
     {
-      "path": "../docprovider"
-    },
-    {
       "path": "../docregistry"
     },
     {
@@ -35,6 +32,9 @@
     },
     {
       "path": "../translation"
+    },
+    {
+      "path": "../ui-components"
     }
   ]
 }

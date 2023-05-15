@@ -57,6 +57,18 @@
           }
         ]
       }
+    ],
+    "context": [
+      {
+        "command": "console:clear",
+        "selector": ".jp-CodeConsole-content",
+        "rank": 10
+      },
+      {
+        "command": "console:restart-kernel",
+        "selector": ".jp-CodeConsole",
+        "rank": 30
+      }
     ]
   },
   "jupyter.lab.shortcuts": [
@@ -99,6 +111,15 @@
       "description": "Whether the console defaults to showing all\nkernel activity or just kernel activity originating from itself.",
       "type": "boolean",
       "default": false
+    },
+    "promptCellConfig": {
+      "title": "Prompt Cell Configuration",
+      "description": "The configuration for all prompt cells; it will override the CodeMirror default configuration.",
+      "type": "object",
+      "default": {
+        "codeFolding": false,
+        "lineNumbers": false
+      }
     }
   },
   "additionalProperties": false,

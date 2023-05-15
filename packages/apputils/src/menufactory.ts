@@ -1,6 +1,13 @@
+/*
+ * Copyright (c) Jupyter Development Team.
+ * Distributed under the terms of the Modified BSD License.
+ */
+
+import { Text } from '@jupyterlab/coreutils';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
+import { LabIcon } from '@jupyterlab/ui-components';
 import { JSONExt } from '@lumino/coreutils';
-import { Menu } from '@lumino/widgets';
+import { ContextMenu, Menu } from '@lumino/widgets';
 
 /**
  * Helper functions to build a menu from the settings
@@ -56,6 +63,20 @@ export namespace MenuFactory {
     menuFactory: (options: IMenuOptions) => Menu
   ): Menu {
     const menu = menuFactory(item);
+    menu.id = item.id;
+
+    // Set the label in case the menu factory did not.
+    if (!menu.title.label) {
+      menu.title.label = item.label ?? Text.titleCase(menu.id.trim());
+    }
+
+    if (item.icon) {
+      menu.title.icon = LabIcon.resolve({ icon: item.icon });
+    }
+    if (item.mnemonic !== undefined) {
+      menu.title.mnemonic = item.mnemonic;
+    }
+
     item.items
       ?.filter(item => !item.disabled)
       .sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity))
@@ -63,6 +84,26 @@ export namespace MenuFactory {
         addItem(item, menu, menuFactory);
       });
     return menu;
+  }
+
+  /**
+   * Convert an item description in a context menu item object
+   *
+   * @param item Context menu item
+   * @param menu Context menu to populate
+   * @param menuFactory Empty menu factory
+   */
+  export function addContextItem(
+    item: ISettingRegistry.IContextMenuItem,
+    menu: ContextMenu,
+    menuFactory: (options: IMenuOptions) => Menu
+  ): void {
+    const { submenu, ...newItem } = item;
+    // Commands may not have been registered yet; so we don't force it to exist
+    menu.addItem({
+      ...newItem,
+      submenu: submenu ? dataToMenu(submenu, menuFactory) : null
+    } as any);
   }
 
   /**
@@ -76,7 +117,7 @@ export namespace MenuFactory {
     item: ISettingRegistry.IMenuItem,
     menu: Menu,
     menuFactory: (options: IMenuOptions) => Menu
-  ) {
+  ): void {
     const { submenu, ...newItem } = item;
     // Commands may not have been registered yet; so we don't force it to exist
     menu.addItem({
@@ -108,7 +149,9 @@ export namespace MenuFactory {
       if (menu) {
         mergeMenus(item, menu, menuFactory);
       } else {
-        newMenus.push(dataToMenu(item, menuFactory));
+        if (!item.disabled) {
+          newMenus.push(dataToMenu(item, menuFactory));
+        }
       }
     });
     menus.push(...newMenus);
@@ -127,7 +170,7 @@ export namespace MenuFactory {
         const existingItem = menu?.items.find(
           (i, idx) =>
             i.type === entry.type &&
-            i.command === entry.command &&
+            i.command === (entry.command ?? '') &&
             i.submenu?.id === entry.submenu?.id
         );
 
